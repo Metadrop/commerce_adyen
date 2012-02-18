@@ -4,3 +4,4 @@ package = Commerce (contrib)
 dependencies[] = commerce
 dependencies[] = commerce_payment
 core = 7.x
+configure = admin/commerce/config/payment-methods

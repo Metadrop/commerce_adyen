@@ -1,0 +1,7 @@
+Installation Adyen Payment Geteway
+==================================
+
+1. Enable the module.
+2. Go to Store->Configuration->Payment methods and click on "edit" for the Adyen payment method rule.
+3. Choose "edit".
+
