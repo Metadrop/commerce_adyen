@@ -1,0 +1,6 @@
+name = Commerce Adyen
+description = Adyen payment gateway for Drupal Commerce
+package = Commerce (contrib)
+dependencies[] = commerce
+dependencies[] = commerce_payment
+core = 7.x
