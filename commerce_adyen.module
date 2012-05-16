@@ -20,6 +20,12 @@ function commerce_adyen_menu() {
       'access arguments' => array('access checkout'),
       'type' => MENU_CALLBACK,
   );
+  $items['commerce/adyen/notification'] = array(
+      'title' => 'adyen notification',
+      'page callback' => '_commerce_adyen_handle_notification',
+      'access arguments' => array('access checkout'),
+      'type' => MENU_CALLBACK,
+  );
   
   return $items;
 }
@@ -317,4 +323,12 @@ function _commerce_adyen_handle_response() {
       drupal_goto();
   }
   
+}
+
+function _commerce_adyen_handle_notification() {
+  $notification = (object)$_POST;
+  drupal_debug(serialize($notification));
+  
+  echo "[accepted]";
+
 }
