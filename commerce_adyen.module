@@ -271,7 +271,7 @@ function _commerce_adyen_handle_response() {
   
   if ($merchantSig!=$adyen->merchantSig) {
     watchdog('commerce_adyen', t('Received adyen response with invalid HMAC signature.'), array(), WATCHDOG_ERROR);
-    drupal_set_message(t('Commmunication failure. Please contact the system administrator.'), 'error');
+    drupal_set_message(t('Communication failure. Please contact the system administrator.'), 'error');
     // we don't call commerce_payment_redirect_pane_previous_page($order) here
     // because we cannot trust the data we received
     drupal_goto();
@@ -279,7 +279,7 @@ function _commerce_adyen_handle_response() {
   
   if (!is_numeric($adyen->merchantReference)) {
     watchdog('commerce_adyen', t('Received adyen response with invalid merchantReference.'), array(), WATCHDOG_ERROR);
-    drupal_set_message(t('Commmunication failure. Please contact the system administrator.'), 'error');
+    drupal_set_message(t('Communication failure. Please contact the system administrator.'), 'error');
     // we don't call commerce_payment_redirect_pane_previous_page($order) here
     // because we cannot trust the data we received
     drupal_goto();
@@ -317,7 +317,7 @@ function _commerce_adyen_handle_response() {
       break;
     default:
       watchdog('commerce_adyen', t('Received adyen response with invalid authResult.'), array(), WATCHDOG_ERROR);
-      drupal_set_message(t('Commmunication failure. Please contact the system administrator.'), 'error');
+      drupal_set_message(t('Communication failure. Please contact the system administrator.'), 'error');
       // we don't call commerce_payment_redirect_pane_previous_page($order) here
       // because we cannot trust the data we received
       drupal_goto();
