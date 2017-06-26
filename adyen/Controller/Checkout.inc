@@ -2,14 +2,14 @@
 
 namespace Commerce\Adyen\Payment\Controller;
 
-use Commerce\Adyen\Payment\Facade;
+use Commerce\Utils\OrderPayment;
 
 /**
  * Base checkout controller.
  */
 abstract class Checkout extends Controller {
 
-  use Facade;
+  use OrderPayment;
 
   /**
    * Build checkout form to allow customers fill additional data.

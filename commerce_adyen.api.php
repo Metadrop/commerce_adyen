@@ -6,16 +6,9 @@
  */
 
 /**
- * Allow alter the data used to create payment authorisation.
+ * {@inheritdoc}
  *
- * @param \Commerce\Adyen\Payment\Authorisation\Request $payment
- *   Payment authorisation request that will be sent to Adyen.
- * @param \stdClass $order
- *   Commerce order.
- * @param array $payment_method
- *   Commerce payment method.
- *
- * @see commerce_adyen_redirect_form()
+ * @see hook_PAYMENT_METHOD_payment_authorisation_request_alter()
  */
 function hook_commerce_adyen_payment_authorisation_request_alter(\Commerce\Adyen\Payment\Authorisation\Request $payment, \stdClass $order, array $payment_method) {
   $payment->setSessionValidity(strtotime('+ 2 hour'));
@@ -23,16 +16,9 @@ function hook_commerce_adyen_payment_authorisation_request_alter(\Commerce\Adyen
 }
 
 /**
- * Allow alter the data used to process payment authorisation.
+ * {@inheritdoc}
  *
- * @param \Commerce\Adyen\Payment\Authorisation\Response $payment
- *   Payment authorisation response that has been received from Adyen.
- * @param \stdClass $order
- *   Commerce order.
- * @param array $payment_method
- *   Commerce payment method.
- *
- * @see commerce_adyen_redirect_form_validate()
+ * @see hook_PAYMENT_METHOD_payment_authorisation_response_alter()
  */
 function hook_commerce_adyen_payment_authorisation_response_alter(\Commerce\Adyen\Payment\Authorisation\Response $payment, \stdClass $order, array $payment_method) {
   switch ($payment->getAuthenticationResult()) {
@@ -126,17 +112,10 @@ function hook_commerce_adyen_refund_rejected(\Commerce\Adyen\Payment\Transaction
 }
 
 /**
- * React on a notification from Adyen.
+ * {@inheritdoc}
  *
- * @param string $event_code
- *   One of event codes in a lowercase.
- * @param \stdClass $order
- *   Commerce order.
- * @param \stdClass $data
- *   Received data (from $_REQEUST superglobal).
- *
+ * @see hook_PAYMENT_METHOD_notification()
  * @link https://docs.adyen.com/developers/api-manual#notificationfields
- * @see commerce_adyen_notification()
  */
 function hook_commerce_adyen_notification($event_code, \stdClass $order, \stdClass $data) {
   switch ($event_code) {
@@ -184,38 +163,6 @@ function hook_commerce_adyen_payment_types() {
  */
 function hook_commerce_adyen_payment_types_alter(array &$payment_types) {
   unset($payment_types['openinvoice']);
-}
-
-/**
- * Provide transactions implementations.
- *
- * @return string[]
- *   An associative array where key - is an unique name of transaction type
- *   and value - is fully qualified name of class implementing the logic.
- *
- * @see commerce_adyen_transaction_types()
- */
-function hook_commerce_adyen_transaction_types() {
-  $types = [];
-
-  // Currently we are having only two transaction types.
-  $types['payment'] = \Commerce\Adyen\Payment\Transaction\Payment::class;
-  $types['refund'] = \Commerce\Adyen\Payment\Transaction\Refund::class;
-
-  return $types;
-}
-
-/**
- * Allow to alter existing definitions of transaction types.
- *
- * @param string[] $transaction_types
- *   List of transaction types and FQN of classes implementing the logic.
- *
- * @see hook_commerce_adyen_transaction_types()
- */
-function hook_commerce_adyen_transaction_types_alter(array &$transaction_types) {
-  // Change implementing class for refund transaction.
-  $transaction_types['refund'] = \Commerce\Adyen\Payment\Transaction\Refund::class;
 }
 
 /**

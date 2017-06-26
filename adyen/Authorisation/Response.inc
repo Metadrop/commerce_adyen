@@ -2,14 +2,19 @@
 
 namespace Commerce\Adyen\Payment\Authorisation;
 
-use Commerce\Adyen\Payment\Transaction\Payment;
+use Commerce\Utils\Payment\Authorisation\ResponseBase;
+use Commerce\Adyen\Payment\Transaction\Payment as PaymentTransaction;
 
 /**
  * Payment authorisation response.
  *
+ * @method PaymentTransaction getTransaction()
+ *
  * @link https://docs.adyen.com/developers/hpp-manual#hpppaymentresponse
  */
-class Response extends Signature {
+class Response extends ResponseBase {
+
+  use Signature;
 
   /**
    * An error occurred during the payment processing.
@@ -41,21 +46,9 @@ class Response extends Signature {
   const AUTHORISED = 'AUTHORISED';
 
   /**
-   * Payment transaction.
-   *
-   * @var Payment
+   * {@inheritdoc}
    */
-  private $transaction;
-
-  /**
-   * Response constructor.
-   *
-   * @param \stdClass $order
-   *   Commerce order.
-   * @param array $payment_method
-   *   Payment method information.
-   */
-  public function __construct(\stdClass $order, array $payment_method) {
+  public function __construct(PaymentTransaction $transaction, array $payment_method) {
     $query = [];
 
     // Using $_GET all dots will be converted to underscores.
@@ -85,7 +78,16 @@ class Response extends Signature {
       throw new \UnexpectedValueException(t('Empty response from Adyen has been received.'));
     }
 
-    parent::__construct($order, $payment_method);
+    $transaction->setPayload($this->data);
+    $transaction->setRemoteStatus($this->data['authResult']);
+
+    // The "pspReference" property will not exist in cases like
+    // payment cancellation or similar.
+    if (isset($this->data['pspReference'])) {
+      $transaction->setRemoteId($this->data['pspReference']);
+    }
+
+    parent::__construct($transaction, $payment_method);
 
     // The "getSignature" method uses "$this->data" property for generating
     // signature. As this is response from Adyen we should not perform any
@@ -93,16 +95,6 @@ class Response extends Signature {
     // be generated. In simple words: we should use raw data for calculation.
     if ($this->getSignature() !== $this->data['merchantSig']) {
       throw new \UnexpectedValueException(t('Received Adyen response with invalid signature.'));
-    }
-
-    $this->transaction = commerce_adyen_get_transaction_instance('payment', $order);
-    $this->transaction->setPayload($this->data);
-    $this->transaction->setRemoteStatus($this->data['authResult']);
-
-    // The "pspReference" property will not exist in cases like
-    // payment cancellation or similar.
-    if (isset($this->data['pspReference'])) {
-      $this->transaction->setRemoteId($this->data['pspReference']);
     }
   }
 
@@ -124,16 +116,6 @@ class Response extends Signature {
    */
   public function getAuthenticationResult() {
     return $this->data['authResult'];
-  }
-
-  /**
-   * Returns payment transaction.
-   *
-   * @return Payment
-   *   Payment transaction.
-   */
-  public function getTransaction() {
-    return $this->transaction;
   }
 
 }

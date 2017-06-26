@@ -7,13 +7,15 @@ use Adyen\Service\Recurring;
 use Commerce\Adyen\Payment\Client;
 use Commerce\Adyen\Payment\ShopperInteraction;
 use Commerce\Adyen\Payment\Controller\Payment;
+use Commerce\Utils\Payment\Authorisation\RequestBase;
 
 /**
  * Payment authorisation request.
  */
-class Request extends Signature {
+class Request extends RequestBase {
 
   use Client;
+  use Signature;
 
   /**
    * Default endpoint to send the request.
@@ -40,12 +42,7 @@ class Request extends Signature {
   protected $endpoint = '';
 
   /**
-   * Request constructor.
-   *
-   * @param \stdClass $order
-   *   Commerce order.
-   * @param array $payment_method
-   *   Payment method information.
+   * {@inheritdoc}
    */
   public function __construct(\stdClass $order, array $payment_method) {
     if (empty($payment_method['settings'])) {
@@ -78,7 +75,7 @@ class Request extends Signature {
 
     // The default result landing page shoppers are redirected to when
     // they complete a payment on the HPP. This value cannot be changed!
-    $this->data['resURL'] = url('checkout/' . $order->order_id . '/payment/return/' . $order->data['payment_redirect_key'], ['absolute' => TRUE]);
+    $this->data['resURL'] = $this->returnLink('return');
   }
 
   /**
@@ -450,12 +447,9 @@ class Request extends Signature {
   }
 
   /**
-   * Returns endpoint URL.
+   * {@inheritdoc}
    *
    * @link https://docs.adyen.com/developers/hpp-manual#hppendpoints
-   *
-   * @return string
-   *   Endpoint URL.
    */
   public function getEndpoint() {
     return sprintf('https://%s.adyen.com/hpp/%s.shtml', $this->getPaymentMethod()['settings']['mode'], $this->endpoint);
@@ -497,7 +491,7 @@ class Request extends Signature {
   }
 
   /**
-   * Sign payment request.
+   * {@inheritdoc}
    */
   public function signRequest() {
     $this->data['merchantSig'] = $this->getSignature();

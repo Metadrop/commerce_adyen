@@ -2,12 +2,13 @@
 
 namespace Commerce\Adyen\Payment\Transaction;
 
-use Commerce\Utils\Transaction as TransactionBase;
+use Commerce\Utils\Transaction;
+use Commerce\Utils\TransactionAuthorisationInterface;
 
 /**
  * Adyen payment transaction.
  */
-class Payment extends TransactionBase {
+class Payment extends Transaction implements TransactionAuthorisationInterface {
 
   /**
    * {@inheritdoc}
@@ -24,27 +25,21 @@ class Payment extends TransactionBase {
   }
 
   /**
-   * Authorise a transaction.
-   *
-   * @param string|int $remote_id
-   *   Remote identifier of a payment transaction.
+   * {@inheritdoc}
    */
   public function authorise($remote_id) {
     $this->setRemoteId($remote_id);
-    $this->setStatus(COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED);
+    $this->setStatus(COMMERCE_PAYMENT_STATUS_AUTHORISED);
     $this->setRemoteStatus(COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED);
     $this->setMessage('Payment has been successfully authorised.');
   }
 
   /**
-   * Check if payment was only authorised and waiting for capturing.
-   *
-   * @return bool
-   *   A state of check.
+   * {@inheritdoc}
    */
   public function isAuthorised() {
     return
-      $this->getStatus() === COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED &&
+      $this->getStatus() === COMMERCE_PAYMENT_STATUS_AUTHORISED &&
       $this->getRemoteStatus() === COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_AUTHORISED;
   }
 

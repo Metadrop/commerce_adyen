@@ -10,17 +10,9 @@
  */
 define('COMMERCE_ADYEN_PAYMENT_METHOD', 'commerce_adyen');
 /**
- * URL to send notifications to.
- */
-define('COMMERCE_ADYEN_NOTIFICATION_URL', 'commerce/adyen/notification');
-/**
  * Name of instances of payment method.
  */
 define('COMMERCE_ADYEN_PAYMENT_METHOD_INSTANCE', sprintf('%s|commerce_payment_%1$s', COMMERCE_ADYEN_PAYMENT_METHOD));
-/**
- * Drupal payment status. Do not mix up with "remote_status"!
- */
-define('COMMERCE_ADYEN_PAYMENT_STATUS_AUTHORISED', 'authorised');
 /**
  * Remote status of a payment. Money has been captured.
  */
@@ -39,54 +31,8 @@ define('COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_PENDING', 'pending');
 define('COMMERCE_ADYEN_PAYMENT_REMOTE_STATUS_FAILURE', 'failure');
 
 use Commerce\Adyen\Payment\Capture;
-use Commerce\Adyen\Payment\Transaction\Refund as RefundTransaction;
-use Commerce\Adyen\Payment\Transaction\Payment as PaymentTransaction;
 use Commerce\Adyen\Payment\Controller\Payment;
 use Commerce\Adyen\Payment\Controller\Checkout;
-
-/**
- * Implements hook_menu().
- */
-function commerce_adyen_menu() {
-  $items = [];
-
-  $items[COMMERCE_ADYEN_NOTIFICATION_URL] = [
-    'type' => MENU_CALLBACK,
-    'file' => 'includes/commerce_adyen.notification.inc',
-    'page callback' => 'commerce_adyen_notification',
-    'access callback' => TRUE,
-  ];
-
-  return $items;
-}
-
-/**
- * Implements hook_hook_info().
- */
-function commerce_adyen_hook_info() {
-  $api = module_load_include('api.php', 'commerce_adyen');
-  $info = [];
-  $matches = [];
-
-  if (FALSE === $api) {
-    throw new \RuntimeException(t('File "@file" with API documentations is not readable! Work of Commerce Adyen is impossible.', [
-      '@file' => $api,
-    ]));
-  }
-
-  // Read all function definitions from API documentation.
-  preg_match_all('/function\s+(' . DRUPAL_PHP_FUNCTION_PATTERN . ')/i', file_get_contents($api), $matches);
-
-  if (!empty($matches[1])) {
-    foreach (array_filter($matches[1], 'function_exists') as $hook) {
-      $info[str_replace('hook_', '', $hook)] = [
-        'group' => 'commerce',
-      ];
-    }
-  }
-
-  return $info;
-}
 
 /**
  * Get payment type definitions.
@@ -97,7 +43,7 @@ function commerce_adyen_hook_info() {
  * @see hook_commerce_adyen_payment_types()
  */
 function commerce_adyen_payment_types() {
-  return commerce_adyen_services_collector(__FUNCTION__, function ($type, array $payment_type) {
+  return service_collector(__FUNCTION__, function ($type, array $payment_type) {
     if (empty($payment_type['label'])) {
       throw new \InvalidArgumentException(t('Adyen payment type definition must have a label.'));
     }
@@ -121,48 +67,6 @@ function commerce_adyen_payment_types() {
 }
 
 /**
- * Get transaction type definitions.
- *
- * @return string[]
- *   Transaction type definitions.
- *
- * @see hook_commerce_adyen_transaction_types()
- */
-function commerce_adyen_transaction_types() {
-  // All attempts to override one of these transaction types should
-  // be restricted by forcing class inheritance.
-  $fundamental = [
-    'payment' => PaymentTransaction::class,
-    'refund' => RefundTransaction::class,
-  ];
-
-  $types = commerce_adyen_services_collector(__FUNCTION__, function ($type, $class) use ($fundamental) {
-    if (!class_exists($class)) {
-      throw new \InvalidArgumentException(t('Class %class does not exists.', [
-        '%class' => $class,
-      ]));
-    }
-
-    if (isset($fundamental[$type]) && !is_subclass_of($class, $fundamental[$type])) {
-      throw new \InvalidArgumentException(t('Transaction class %class must be inherited from %parent.', [
-        '%class' => $class,
-        '%parent' => $fundamental[$type],
-      ]));
-    }
-  });
-
-  // Prevent possibility to remove fundamental types. Set the
-  // default implementations to guarantee module operability.
-  foreach ($fundamental as $type => $class) {
-    if (empty($types[$type])) {
-      $types[$type] = $class;
-    }
-  }
-
-  return $types;
-}
-
-/**
  * Get an instance of transaction.
  *
  * @param string $type
@@ -172,76 +76,11 @@ function commerce_adyen_transaction_types() {
  * @param string $remote_status
  *   Will be used as condition for loading existing transaction.
  *
- * @return PaymentTransaction|RefundTransaction
+ * @return \Commerce\Adyen\Payment\Transaction\Payment|\Commerce\Adyen\Payment\Transaction\Refund
  *   An instance of transaction object.
- *
- * @see commerce_adyen_transaction_types()
  */
 function commerce_adyen_get_transaction_instance($type, $order, $remote_status = '') {
-  $types = commerce_adyen_transaction_types();
-
-  if (empty($types[$type])) {
-    throw new \InvalidArgumentException(t('Transaction type %type is not registered.', [
-      '%type' => $type,
-    ]));
-  }
-
-  return new $types[$type]($order, $remote_status);
-}
-
-/**
- * Collect data via Drupal hooks and allow to alter it.
- *
- * @param string $id
- *   An unique ID of implementations to collect. The "hook_$id"
- *   and "hook_$id_alter" functions will be called. In other words
- *   the "$id" - is the name of hook.
- * @param callable $resolver
- *   Function to validate the implementation. Must throw an exception
- *   to not place obtained element into the list.
- *
- * @return array
- *   An array of collected implementations.
- */
-function commerce_adyen_services_collector($id, callable $resolver) {
-  $cache_id = "commerce_adyen_services:$id";
-  $cache = cache_get($cache_id);
-  $data = [];
-
-  if (FALSE === $cache || empty($cache->data)) {
-    $validator = function ($name, $item) use (&$data, $resolver) {
-      try {
-        // Throw an exception from resolver to not add the item to the list.
-        $resolver($name, $item);
-        // Validation passed. Add the data.
-        $data[$name] = $item;
-      }
-      catch (\Exception $e) {
-        unset($data[$name]);
-        watchdog_exception(COMMERCE_ADYEN_PAYMENT_METHOD, $e);
-      }
-    };
-
-    // Collect data.
-    foreach (module_invoke_all($id) as $name => $item) {
-      $validator($name, $item);
-    }
-
-    // Allow other modules to alter the implementations.
-    drupal_alter($id, $data);
-
-    // Validate data again after alteration.
-    foreach ($data as $name => $item) {
-      $validator($name, $item);
-    }
-
-    cache_set($cache_id, $data);
-  }
-  else {
-    $data = $cache->data;
-  }
-
-  return $data;
+  return commerce_utils_get_transaction_instance(COMMERCE_ADYEN_PAYMENT_METHOD, $type, $order, $remote_status);
 }
 
 /**

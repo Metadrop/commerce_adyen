@@ -2,15 +2,18 @@
 
 namespace Commerce\Adyen\Payment;
 
-use Adyen\AdyenException;
 use Adyen\Service\Modification as ModificationBase;
-use Commerce\Adyen\Payment\Transaction\Refund;
-use Commerce\Adyen\Payment\Transaction\Payment;
+use Commerce\Utils\Payment\Action\ActionBase;
 
 /**
  * Abstract modification request.
+ *
+ * @property \Commerce\Adyen\Payment\Transaction\Refund|\Commerce\Adyen\Payment\Transaction\Payment $transaction
+ *
+ * @link https://github.com/Adyen/adyen-php-sample-code/blob/master/4.Modifications/httppost/refund.php
+ * @link https://github.com/Adyen/adyen-php-sample-code/blob/master/4.Modifications/httppost/capture.php
  */
-abstract class Modification {
+abstract class Modification extends ActionBase {
 
   use Client;
 
@@ -24,63 +27,16 @@ abstract class Modification {
   const CAPTURE = 'capture';
 
   /**
-   * The type of modification request to send.
-   *
-   * @var string
+   * {@inheritdoc}
    */
-  private $modificationType = '';
-  /**
-   * Transaction.
-   *
-   * @var Payment|Refund
-   */
-  protected $transaction;
-
-  /**
-   * Modification constructor.
-   *
-   * @param \stdClass|int|string $order
-   *   Commerce order object or order ID.
-   * @param string $remote_transaction_status
-   *   Remote status of the transaction.
-   * @param string $modification_type
-   *   The type of modification request to send. Use one of constants.
-   */
-  public function __construct($order, $remote_transaction_status, $modification_type) {
-    $this->modificationType = $modification_type;
-    $this->transaction = commerce_adyen_get_transaction_instance($this->getTransactionType(), $order, $remote_transaction_status);
-  }
-
-  /**
-   * Checks whether modification is available.
-   *
-   * @return bool
-   *   A state of check.
-   */
-  abstract public function isAvailable();
-
-  /**
-   * Send a modification request.
-   *
-   * @return bool
-   *   Whether request was successfully sent or not.
-   *
-   * @throws AdyenException
-   * @throws \InvalidArgumentException
-   *
-   * @link https://github.com/Adyen/adyen-php-sample-code/blob/master/4.Modifications/httppost/refund.php
-   * @link https://github.com/Adyen/adyen-php-sample-code/blob/master/4.Modifications/httppost/capture.php
-   */
-  final public function request() {
-    $payment_method = $this->transaction->getPaymentMethod();
+  protected function buildRequest() {
     $currency_code = $this->transaction->getCurrency();
-    $order = $this->transaction->getOrder()->value();
 
     // Make an API call to tell Adyen that we are waiting for notification
     // from it.
-    $request = [
-      'reference' => $order->order_number,
-      'merchantAccount' => $payment_method['settings']['merchant_account'],
+    return [
+      'reference' => $this->transaction->getOrder()->order_number->value(),
+      'merchantAccount' => $this->transaction->getPaymentMethod()['settings']['merchant_account'],
       'originalReference' => $this->transaction->getRemoteId(),
       'modificationAmount' => [
         'currency' => $currency_code,
@@ -88,40 +44,38 @@ abstract class Modification {
         'value' => abs(commerce_adyen_amount($this->transaction->getAmount(), $currency_code)),
       ],
     ];
-
-    $modification = (new ModificationBase($this->getClient($payment_method)))->{$this->modificationType}($request);
-    $status = "[{$this->modificationType}-received]" === $modification['response'];
-    $hook = $status ? 'received' : 'rejected';
-
-    watchdog(COMMERCE_ADYEN_PAYMENT_METHOD, "Request for %modification_type has been {$hook} by Adyen: <pre>@payload</pre>", [
-      '@payload' => var_export($request, TRUE),
-      '%modification_type' => $this->modificationType,
-    ]);
-
-    module_invoke_all("commerce_adyen_{$this->modificationType}_{$hook}", $this->transaction, $order);
-
-    return $status;
   }
 
   /**
-   * Validate modification type and return transaction type.
+   * {@inheritdoc}
    *
-   * @return string
-   *   Type of transaction.
+   * @throws \Adyen\AdyenException
    */
-  private function getTransactionType() {
-    switch ($this->modificationType) {
+  protected function sendRequest($request) {
+    $modification = (new ModificationBase($this->getClient($this->getPaymentMethod())))->{$this->action}($request);
+
+    if ("[{$this->action}-received]" !== $modification['response']) {
+      throw new \RuntimeException(t('Capture request was not received by Adyen.'));
+    }
+
+    return $modification;
+  }
+
+  /**
+   * {@inheritdoc}
+   */
+  protected function getTransactionType() {
+    switch ($this->action) {
       case self::REFUND:
         return 'refund';
 
       case self::CAPTURE:
         return 'payment';
-
-      default:
-        throw new \InvalidArgumentException(t('The "@modification" modification request is not supported.', [
-          '@modification' => $this->modificationType,
-        ]));
     }
+
+    throw new \InvalidArgumentException(t('The "@modification" modification request is not supported.', [
+      '@modification' => $this->action,
+    ]));
   }
 
 }
