@@ -62,13 +62,14 @@ class PaymentController extends Payment {
 
     /* @var \EntityMetadataWrapper $label */
     foreach ($line_items as $line_item) {
-      $line_item_total = $line_item->commerce_total->value();
+      $line_item_unit_price = $line_item->commerce_unit_price->value();
       $line_item_type = $line_item->type->value();
       $currency_code = $line_item->commerce_unit_price->currency_code->value();
-      $vat_amount = commerce_adyen_amount(commerce_vat_total_amount($line_item_total['data']['components'], TRUE, $currency_code), $currency_code);
+      // Vat amount for single item in the line item.
+      $vat_amount = commerce_adyen_amount(commerce_vat_total_amount($line_item_unit_price['data']['components'], TRUE, $currency_code), $currency_code);
       $label = isset($line_item->commerce_product) ? $line_item->commerce_product->title : $line_item->line_item_label;
       $item++;
-      $percentage = ($line_item_total['amount'] / ($line_item_total['amount'] - $vat_amount) - 1) * 100;
+      $percentage = ($line_item_unit_price['amount'] / ($line_item_unit_price['amount'] - $vat_amount) - 1) * 100;
 
       foreach ([
         // Referring to Adyen documentation we must send item price having VAT
@@ -81,7 +82,7 @@ class PaymentController extends Payment {
         // Can be one these values: "High", "Low", "None".
         // @see https://github.com/Adyen/adyen-magento2/blob/46c6758b3fc472a52a0bf5a7dd2fbf184bfcd970/Block/Redirect/Redirect.php#L459
         'vatCategory' => 'None',
-        // Value must be represented in minor units. E.g. "3 Euro" is "300".
+        // Value must be represented in minor units. E.g. "3 Euro" is "300". Should be for one item.
         'itemVatAmount' => $vat_amount,
         // Value must be represented in minor units. E.g. "7%" is "700".
         'itemVatPercentage' => commerce_round(COMMERCE_ROUND_HALF_UP, $percentage) * 100,
