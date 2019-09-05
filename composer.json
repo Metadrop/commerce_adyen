@@ -1,4 +1,7 @@
 {
+  "name": "metadrop/commerce_adyen",
+  "description": "Adyen payment gateway for Drupal Commerce.",
+  "type": "drupal-module",
   "require": {
     "adyen/php-api-library": "1.*"
   }
