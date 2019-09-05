@@ -1,5 +1,5 @@
 {
-  "name": "drupal/commerce_adyen",
+  "name": "metadrop/commerce_adyen",
   "description": "Adyen payment gateway for Drupal Commerce.",
   "type": "drupal-module",
   "require": {
